@@ -5,7 +5,22 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
-import "./tailwind.css";
+import type { LinksFunction, MetaFunction } from "@remix-run/node";
+import stylesheet from "@/tailwind.css?url";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Snaply" },
+    {
+      name: "description",
+      content: "Welcome to Snaply! A modern social media application.",
+    },
+  ];
+};
+
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: stylesheet },
+];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

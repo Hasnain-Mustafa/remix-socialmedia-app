@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: snaply-db
+    volumes:
+      - ./dbData:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
