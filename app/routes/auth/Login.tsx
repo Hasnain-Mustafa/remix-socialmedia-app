@@ -1,30 +1,37 @@
+import type { ActionFunction, LoaderFunction } from "@remix-run/node";
 import { Link } from "@remix-run/react";
 import { z } from "zod";
 import { Form } from "@/lib/form";
-import { formAction } from "@/form-action";
 import { makeDomainFunction } from "domain-functions";
-import type { ActionFunction } from "@remix-run/node";
+import { authenticator } from "@/lib/auth.server";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useNavigation } from "@remix-run/react";
 
 const LoginSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-const mutation = makeDomainFunction(LoginSchema)(async (values) =>
-  console.log(values)
-);
+const mutation = makeDomainFunction(LoginSchema)(async (values) => {});
 
-export const action: ActionFunction = async ({ request }) =>
-  formAction({
-    request,
-    schema: LoginSchema,
-    mutation,
-    successPath: "/",
+export const loader: LoaderFunction = async ({ request }) => {
+  const user = await authenticator.isAuthenticated(request, {
+    successRedirect: "/",
   });
+  return user;
+};
+
+export const action: ActionFunction = async ({ request }) => {
+  return await authenticator.authenticate("user-login", request, {
+    successRedirect: "/",
+    failureRedirect: "/auth/login",
+  });
+};
 
 const LoginForm = () => {
+  const transition = useNavigation();
+  const isLoading = transition.state;
   return (
     <div className="sm:w-420 flex-center flex-col">
       <h2 className="h3-bold md:h2-bold pt-5">Welcome Back!</h2>
@@ -71,14 +78,15 @@ const LoginForm = () => {
               )}
             </Field>
 
-            <Button className="shad-button_primary">Log In</Button>
+            <Button className="shad-button_primary">
+              {isLoading === "submitting" ? "Loading..." : "Log In"}
+            </Button>
 
             <Errors />
           </>
         )}
       </Form>
 
-      {/* Link to Signup Route */}
       <p className="text-small-regular text-light-2 text-center mt-2">
         Don't have an account?
         <Link

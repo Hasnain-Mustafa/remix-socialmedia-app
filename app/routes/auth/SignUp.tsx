@@ -1,29 +1,64 @@
-import { Link } from "@remix-run/react";
+import { json, Link } from "@remix-run/react";
 import { z } from "zod";
 import { Form } from "@/lib/form";
-import { formAction } from "@/form-action";
+import { formAction } from "@/lib/form-action.server";
 import { makeDomainFunction } from "domain-functions";
-import type { ActionFunction } from "@remix-run/node";
+import type { ActionFunction, LoaderFunction } from "@remix-run/node";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import db from "@/lib/prisma.server";
+import argon2 from "argon2";
+import { authenticator } from "@/lib/auth.server";
+import { avatars } from "@/lib/appwrite.server";
+import { getToast, redirectWithSuccess } from "remix-toast";
 
 const SignupSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  username: z.string().min(1, "Username is required"),
   email: z.string().email("Invalid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-const mutation = makeDomainFunction(SignupSchema)(async (values) =>
-  console.log(values)
-);
+const mutation = makeDomainFunction(SignupSchema)(async (values) => {
+  const { name, username, email, password } = values;
 
-export const action: ActionFunction = async ({ request }) =>
-  formAction({
+  const hashedPassword = await argon2.hash(password);
+  const avatarUrl = avatars.getInitials(name);
+
+  await db.user.create({
+    data: {
+      name,
+      username,
+      email,
+      password: hashedPassword,
+      imageId: "",
+      imageUrl: avatarUrl,
+    },
+  });
+});
+
+export const loader: LoaderFunction = async ({ request }) => {
+  const { toast, headers } = await getToast(request);
+  const user = await authenticator.isAuthenticated(request);
+
+  if (user) {
+    return redirectWithSuccess("/", `You're already logged in`);
+  }
+
+  return json({ toast }, { headers });
+};
+
+export const action: ActionFunction = async ({ request }) => {
+  await formAction({
     request,
     schema: SignupSchema,
     mutation,
-    successPath: "/success",
   });
+
+  const user = await authenticator.authenticate("user-login", request);
+
+  return redirectWithSuccess("/", `Welcome ${user.name}`);
+};
 
 const SignupForm = () => {
   return (
@@ -46,6 +81,23 @@ const SignupForm = () => {
                     id="name"
                     placeholder="Name"
                     {...register("name")}
+                    className="shad-input"
+                  />
+                  <Errors className="shad-form_message" />
+                </div>
+              )}
+            </Field>
+
+            <Field name="username" label="Username">
+              {({ Label, Errors }) => (
+                <div className="w-full">
+                  <Label htmlFor="username" className="shad-form_label">
+                    Username
+                  </Label>
+                  <Input
+                    id="username"
+                    placeholder="Username"
+                    {...register("username")}
                     className="shad-input"
                   />
                   <Errors className="shad-form_message" />
@@ -96,7 +148,6 @@ const SignupForm = () => {
         )}
       </Form>
 
-      {/* Link to Login Route */}
       <p className="text-small-regular text-light-2 text-center mt-2">
         Already have an account?
         <Link
